@@ -10,6 +10,11 @@ import Landing from "./pages/Landing";
 import Auth from "./pages/Auth";
 import LandownerDashboard from "./pages/LandownerDashboard";
 import GardenerDashboard from "./pages/GardenerDashboard";
+import SpaceForm from "./pages/SpaceForm";
+import LandownerRequests from "./pages/LandownerRequests";
+import SpaceDetail from "./pages/SpaceDetail";
+import ChatPage from "./pages/ChatPage";
+import QRCodePage from "./pages/QRCodePage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -24,14 +29,42 @@ const App = () => (
           <Routes>
             <Route path="/" element={<Landing />} />
             <Route path="/auth" element={<Auth />} />
+            
+            {/* Landowner Routes */}
             <Route
-              path="/dashboard/landowner/*"
+              path="/dashboard/landowner"
               element={
                 <ProtectedRoute requiredRole="landowner">
                   <LandownerDashboard />
                 </ProtectedRoute>
               }
             />
+            <Route
+              path="/dashboard/landowner/spaces/new"
+              element={
+                <ProtectedRoute requiredRole="landowner">
+                  <SpaceForm />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/dashboard/landowner/spaces/:id/edit"
+              element={
+                <ProtectedRoute requiredRole="landowner">
+                  <SpaceForm />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/dashboard/landowner/requests"
+              element={
+                <ProtectedRoute requiredRole="landowner">
+                  <LandownerRequests />
+                </ProtectedRoute>
+              }
+            />
+
+            {/* Gardener Routes */}
             <Route
               path="/dashboard/gardener"
               element={
@@ -40,6 +73,29 @@ const App = () => (
                 </ProtectedRoute>
               }
             />
+            <Route
+              path="/spaces/:id"
+              element={
+                <ProtectedRoute requiredRole="gardener">
+                  <SpaceDetail />
+                </ProtectedRoute>
+              }
+            />
+
+            {/* Shared Routes (both roles) */}
+            <Route
+              path="/requests/:id/chat"
+              element={
+                <ProtectedRoute>
+                  <ChatPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/requests/:id/qr"
+              element={<QRCodePage />}
+            />
+
             <Route path="*" element={<NotFound />} />
           </Routes>
         </AuthProvider>
