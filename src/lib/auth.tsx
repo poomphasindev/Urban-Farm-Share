@@ -53,6 +53,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUserRole(null);
       return null;
     } catch (err) {
+      console.error("Exception fetching user role:", err);
       setUserRole(null);
       return null;
     }
@@ -61,6 +62,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
+        console.log("Auth state changed:", event);
         setSession(session);
         setUser(session?.user ?? null);
 
@@ -86,11 +88,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => subscription.unsubscribe();
   }, []);
 
-  const signUp = async (email: string, password: string, name: string, role: "landowner" | "gardener") => {
+  const signUp = async (
+    email: string,
+    password: string,
+    name: string,
+    role: "landowner" | "gardener"
+  ) => {
     try {
+      console.log("Starting signup process...");
       const redirectUrl = `${window.location.origin}/`;
 
-      const { data, error } = await supabase.auth.signUp({
+      // Step 1: Sign up the user
+      const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
         email,
         password,
         options: {
@@ -101,50 +110,90 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         },
       });
 
-      if (error) {
-        throw error;
+      if (signUpError) {
+        console.error("Signup error:", signUpError);
+        throw signUpError;
       }
 
-      if (data.user) {
-        console.log(`Inserting role "${role}" for user ${data.user.id}`);
+      if (!signUpData.user) {
+        throw new Error("User creation failed - no user returned");
+      }
 
-        const { error: insertError } = await supabase
-          .from("user_roles")
-          .insert({ user_id: data.user.id, role });
+      console.log("User created:", signUpData.user.id);
 
-        if (insertError) {
-          console.error("Failed to insert user role:", insertError);
-          if (!insertError.message?.includes("duplicate")) {
-            return { error: insertError as Error };
-          }
+      // Step 2: Wait a moment for the user to be fully created
+      await new Promise(resolve => setTimeout(resolve, 500));
+
+      // Step 3: Sign in the user immediately (this ensures they're authenticated)
+      const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (signInError) {
+        console.error("Auto sign-in error:", signInError);
+        // Don't throw here, user can still sign in manually
+      } else {
+        console.log("User auto-signed in:", signInData.user?.id);
+      }
+
+      // Step 4: Insert role (user is now authenticated)
+      console.log(`Inserting role "${role}" for user ${signUpData.user.id}`);
+      
+      const { error: roleError } = await supabase
+        .from("user_roles")
+        .insert({ 
+          user_id: signUpData.user.id, 
+          role: role 
+        });
+
+      if (roleError) {
+        console.error("Role insertion error:", roleError);
+        // Check if it's a duplicate error (user somehow already has a role)
+        if (!roleError.message?.includes("duplicate")) {
+          throw roleError;
         }
+      } else {
+        console.log("Role inserted successfully");
       }
+
+      // Step 5: Fetch the role to confirm
+      await fetchUserRole(signUpData.user.id);
 
       return { error: null };
     } catch (error) {
+      console.error("SignUp process failed:", error);
       return { error: error as Error };
     }
   };
 
   const signIn = async (email: string, password: string) => {
     try {
+      console.log("Starting sign in...");
+      
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
 
       if (error) {
+        console.error("Sign in error:", error);
         throw error;
       }
 
-      const userId = data.user?.id || (await supabase.auth.getUser()).data.user?.id;
-      let role: UserRole = null;
-      if (userId) {
-        role = await fetchUserRole(userId);
+      if (!data.user) {
+        throw new Error("Sign in failed - no user returned");
       }
+
+      console.log("User signed in:", data.user.id);
+
+      // Fetch role
+      const role = await fetchUserRole(data.user.id);
+      console.log("User role:", role);
 
       return { error: null, role };
     } catch (error) {
+      console.error("SignIn process failed:", error);
       return { error: error as Error };
     }
   };
