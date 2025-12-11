@@ -2,280 +2,177 @@ import { useState, useEffect } from "react";
 import { useAuth } from "@/lib/auth";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { TreePine, Plus, MapPin, Edit, Trash2, Eye, AlertCircle } from "lucide-react";
+import { TreePine, Plus, MapPin, Edit, Trash2, Eye, EyeOff, MessageSquare, LogOut } from "lucide-react";
 import { Link } from "react-router-dom";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
-
-interface UrbanFarmSpace {
-  id: string;
-  title: string;
-  description: string;
-  address: string;
-  area_size: string;
-  tags: string | null;
-  is_active: boolean;
-  created_at: string;
-}
+import { Skeleton } from "@/components/ui/skeleton";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 export default function LandownerDashboard() {
   const { user, signOut } = useAuth();
   const { toast } = useToast();
-  const [spaces, setSpaces] = useState<UrbanFarmSpace[]>([]);
+  const [spaces, setSpaces] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [requestCounts, setRequestCounts] = useState<Record<string, number>>({});
+  const [userProfile, setUserProfile] = useState<any>(null);
 
   useEffect(() => {
     if (user) {
       fetchSpaces();
+      fetchProfile();
     }
   }, [user]);
 
+  const fetchProfile = async () => {
+    const { data } = await supabase.from("profiles").select("*").eq("id", user!.id).single();
+    if (data) setUserProfile(data);
+  };
+
   const fetchSpaces = async () => {
     setLoading(true);
-
-    const { data: spacesData, error: spacesError } = await supabase
+    const { data, error } = await supabase
       .from("urban_farm_spaces")
       .select("*")
       .eq("owner_id", user!.id)
       .order("created_at", { ascending: false });
 
-    if (spacesError) {
-      toast({
-        title: "Error",
-        description: "Failed to load your spaces",
-        variant: "destructive",
-      });
-    } else if (spacesData) {
-      setSpaces(spacesData as UrbanFarmSpace[]);
-
+    if (!error && data) {
+      setSpaces(data);
       const counts: Record<string, number> = {};
-      for (const space of spacesData) {
+      for (const space of data) {
         const { count } = await supabase
           .from("space_requests")
           .select("*", { count: "exact", head: true })
           .eq("space_id", space.id)
           .eq("status", "pending");
-
         counts[space.id] = count || 0;
       }
       setRequestCounts(counts);
     }
-
     setLoading(false);
   };
 
-  const handleDelete = async (spaceId: string) => {
-    if (!confirm("Are you sure you want to delete this space?")) {
-      return;
-    }
-
-    const { error } = await supabase
-      .from("urban_farm_spaces")
-      .delete()
-      .eq("id", spaceId);
-
-    if (error) {
-      toast({
-        title: "Error",
-        description: "Failed to delete space",
-        variant: "destructive",
-      });
-    } else {
-      toast({
-        title: "Success",
-        description: "Space deleted successfully",
-      });
-      fetchSpaces();
-    }
+  const handleToggleActive = async (spaceId: string, currentStatus: boolean) => {
+    setSpaces(spaces.map(s => s.id === spaceId ? { ...s, is_active: !currentStatus } : s));
+    await supabase.from("urban_farm_spaces").update({ is_active: !currentStatus }).eq("id", spaceId);
   };
 
-  const handleToggleActive = async (spaceId: string, currentStatus: boolean) => {
-    const { error } = await supabase
-      .from("urban_farm_spaces")
-      .update({ is_active: !currentStatus })
-      .eq("id", spaceId);
-
-    if (error) {
-      toast({
-        title: "Error",
-        description: "Failed to update space status",
-        variant: "destructive",
-      });
-    } else {
-      toast({
-        title: "Success",
-        description: `Space ${!currentStatus ? "activated" : "deactivated"}`,
-      });
-      fetchSpaces();
-    }
+  const handleDelete = async (spaceId: string) => {
+    if(!confirm("ยืนยันการลบพื้นที่นี้?")) return;
+    await supabase.from("urban_farm_spaces").delete().eq("id", spaceId);
+    fetchSpaces();
+    toast({ title: "ลบพื้นที่สำเร็จ" });
   };
 
   return (
-    <div className="min-h-screen bg-muted/30">
-      {/* Header */}
-      <header className="border-b bg-card">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <Link to="/" className="flex items-center gap-2">
-            <TreePine className="h-8 w-8 text-primary" />
-            <span className="text-xl font-bold">Urban Farm Share</span>
+    <div className="min-h-screen bg-secondary/30 pb-20">
+      <header className="bg-white/80 backdrop-blur-md sticky top-0 z-30 border-b border-border/50 px-4 py-3 shadow-sm">
+        <div className="container mx-auto flex items-center justify-between max-w-4xl">
+          <Link to="/profile" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
+            <Avatar className="h-9 w-9 border cursor-pointer">
+              <AvatarImage src={userProfile?.avatar_url} />
+              <AvatarFallback className="bg-primary/10 text-primary">
+                {userProfile?.name?.charAt(0) || user?.email?.charAt(0)}
+              </AvatarFallback>
+            </Avatar>
+            <div>
+              <p className="text-sm font-bold text-foreground leading-none">
+                {userProfile?.name || "Landowner"}
+              </p>
+              <p className="text-[10px] text-muted-foreground">เจ้าของพื้นที่</p>
+            </div>
           </Link>
-          <div className="flex items-center gap-4">
-            <Button variant="ghost" asChild>
-              <Link to="/dashboard/landowner/requests">Requests</Link>
+          <div className="flex gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              asChild
+              className="rounded-xl text-muted-foreground hover:text-primary"
+            >
+              <Link to="/dashboard/landowner/requests">
+                <MessageSquare className="mr-2 h-4 w-4" /> คำขอ
+              </Link>
             </Button>
-            <Button variant="ghost" onClick={signOut}>
-              Logout
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => signOut()}
+              className="rounded-full hover:bg-red-50 hover:text-red-500"
+            >
+              <LogOut className="h-5 w-5" />
             </Button>
           </div>
         </div>
       </header>
 
-      <div className="container mx-auto px-4 py-8">
-        {/* Welcome Section */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold mb-2">Landowner Dashboard</h1>
-          <p className="text-muted-foreground">
-            Manage your spaces and connect with gardeners
-          </p>
-        </div>
-
-        {/* Quick Stats */}
-        <div className="grid md:grid-cols-3 gap-6 mb-8">
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                Total Spaces
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold">{spaces.length}</div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                Active Spaces
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold text-success">
-                {spaces.filter((s) => s.is_active).length}
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                Pending Requests
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold text-accent">
-                {Object.values(requestCounts).reduce((a, b) => a + b, 0)}
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Action Buttons */}
-        <div className="flex justify-between items-center mb-6">
-          <h2 className="text-2xl font-bold">My Spaces</h2>
-          <Button asChild>
+      <main className="container mx-auto px-4 py-8 max-w-4xl">
+        <div className="flex justify-between items-end mb-8">
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight text-foreground">พื้นที่ของคุณ</h1>
+            <p className="text-muted-foreground text-sm mt-1">จัดการพื้นที่และดูสถานะ</p>
+          </div>
+          <Button asChild className="rounded-full shadow-lg bg-primary hover:bg-primary/90 px-6">
             <Link to="/dashboard/landowner/spaces/new">
-              <Plus className="h-4 w-4 mr-2" />
-              Add New Space
+              <Plus className="mr-2 h-4 w-4" /> เพิ่มพื้นที่
             </Link>
           </Button>
         </div>
 
-        {/* Spaces List */}
         {loading ? (
-          <div className="text-center py-12">
-            <p className="text-muted-foreground">Loading your spaces...</p>
+          <div className="grid md:grid-cols-2 gap-6">
+            {[1, 2].map(i => <Skeleton key={i} className="h-[200px] w-full rounded-3xl" />)}
           </div>
         ) : spaces.length === 0 ? (
-          <Card className="p-12 text-center">
-            <AlertCircle className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-            <h3 className="text-xl font-semibold mb-2">No spaces yet</h3>
-            <p className="text-muted-foreground mb-6">
-              Create your first space listing to start sharing with gardeners
-            </p>
-            <Button asChild>
-              <Link to="/dashboard/landowner/spaces/new">
-                <Plus className="h-4 w-4 mr-2" />
-                Create Your First Space
-              </Link>
-            </Button>
-          </Card>
+          <div className="text-center py-20 bg-white rounded-3xl border border-dashed border-border">
+            <MapPin className="mx-auto h-12 w-12 text-muted-foreground/30 mb-4" />
+            <h3 className="text-lg font-medium text-foreground">ยังไม่มีพื้นที่</h3>
+            <p className="text-muted-foreground mb-6">เริ่มแบ่งปันพื้นที่ว่างของคุณวันนี้</p>
+            <Button variant="outline" className="rounded-full" asChild><Link to="/dashboard/landowner/spaces/new">เพิ่มพื้นที่เลย</Link></Button>
+          </div>
         ) : (
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid md:grid-cols-2 gap-6">
             {spaces.map((space) => (
-              <Card key={space.id} className="overflow-hidden">
-                <CardHeader>
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <CardTitle className="line-clamp-1">{space.title}</CardTitle>
-                      <CardDescription className="flex items-center gap-1 mt-1">
-                        <MapPin className="h-3 w-3" />
-                        {space.address}
-                      </CardDescription>
-                    </div>
-                    <Badge variant={space.is_active ? "default" : "secondary"}>
-                      {space.is_active ? "Active" : "Inactive"}
+              <Card key={space.id} className="group border-none shadow-sm hover:shadow-md transition-all duration-300 rounded-3xl bg-white overflow-hidden">
+                <div className="p-6">
+                  <div className="flex justify-between items-start mb-4">
+                    <Badge variant={space.is_active ? "default" : "secondary"} className={`rounded-lg px-3 py-1 font-medium ${space.is_active ? "bg-green-100 text-green-700 hover:bg-green-200" : "bg-gray-100 text-gray-500"}`}>
+                      {space.is_active ? "เปิดใช้งาน" : "ปิดชั่วคราว"}
                     </Badge>
+                    {requestCounts[space.id] > 0 && (
+                      <Badge className="bg-accent text-white animate-pulse rounded-full px-3">
+                        {requestCounts[space.id]} คำขอใหม่
+                      </Badge>
+                    )}
                   </div>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-sm text-muted-foreground line-clamp-2 mb-4">
-                    {space.description}
-                  </p>
-
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground mb-4">
-                    <span className="font-medium">Size:</span> {space.area_size}
+                  
+                  <h3 className="text-xl font-bold mb-2 line-clamp-1">{space.title}</h3>
+                  
+                  <div className="flex items-center text-muted-foreground text-sm mb-6 bg-secondary/50 p-3 rounded-xl">
+                    <MapPin className="h-4 w-4 mr-2 text-primary shrink-0" />
+                    <span className="truncate">{space.address}</span>
                   </div>
 
-                  {requestCounts[space.id] > 0 && (
-                    <Alert className="mb-4">
-                      <AlertDescription>
-                        {requestCounts[space.id]} pending request(s)
-                      </AlertDescription>
-                    </Alert>
-                  )}
-
-                  <div className="flex gap-2">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="flex-1"
-                      onClick={() => handleToggleActive(space.id, space.is_active)}
-                    >
-                      <Eye className="h-4 w-4 mr-1" />
-                      {space.is_active ? "Hide" : "Show"}
+                  <div className="grid grid-cols-3 gap-2">
+                    <Button variant="outline" size="sm" className="rounded-xl border-border/50 bg-secondary/30 hover:bg-secondary" onClick={() => handleToggleActive(space.id, space.is_active)}>
+                      {space.is_active ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                     </Button>
-                    <Button size="sm" variant="outline" asChild>
+                    <Button variant="outline" size="sm" className="rounded-xl border-border/50 bg-secondary/30 hover:bg-secondary" asChild>
                       <Link to={`/dashboard/landowner/spaces/${space.id}/edit`}>
                         <Edit className="h-4 w-4" />
                       </Link>
                     </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => handleDelete(space.id)}
-                    >
+                    <Button variant="outline" size="sm" className="rounded-xl border-red-100 bg-red-50 text-red-500 hover:bg-red-100 hover:text-red-600" onClick={() => handleDelete(space.id)}>
                       <Trash2 className="h-4 w-4" />
                     </Button>
                   </div>
-                </CardContent>
+                </div>
               </Card>
             ))}
           </div>
         )}
-      </div>
+      </main>
     </div>
   );
 }

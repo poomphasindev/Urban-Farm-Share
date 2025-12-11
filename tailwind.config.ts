@@ -1,4 +1,5 @@
 import type { Config } from "tailwindcss";
+import { fontFamily } from "tailwindcss/defaultTheme"; // 1. เพิ่มบรรทัดนี้
 
 export default {
   darkMode: ["class"],
@@ -13,6 +14,12 @@ export default {
       },
     },
     extend: {
+      // 2. เพิ่มส่วนนี้เข้าไปใน extend
+      fontFamily: {
+        sans: ["Mitr", ...fontFamily.sans],
+      },
+      // จบส่วนที่เพิ่ม
+
       colors: {
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
@@ -82,10 +89,31 @@ export default {
             height: "0",
           },
         },
+        "float": {
+          "0%, 100%": { transform: "translateY(0)" },
+          "50%": { transform: "translateY(-10px)" },
+        },
+        "float-slow": {
+          "0%, 100%": { transform: "translateY(0)" },
+          "50%": { transform: "translateY(-20px)" },
+        },
+        "pulse-soft": {
+          "0%, 100%": { opacity: "1", transform: "scale(1)" },
+          "50%": { opacity: "0.8", transform: "scale(0.95)" },
+        },
+        "wiggle": {
+          "0%, 100%": { transform: "rotate(-3deg)" },
+          "50%": { transform: "rotate(3deg)" },
+        }
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
+        "float": "float 3s ease-in-out infinite",
+        "float-slow": "float-slow 6s ease-in-out infinite",
+        "pulse-soft": "pulse-soft 3s ease-in-out infinite",
+        "wiggle": "wiggle 1s ease-in-out infinite",
+        "spin-slow": "spin 8s linear infinite",
       },
     },
   },

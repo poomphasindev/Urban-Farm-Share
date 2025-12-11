@@ -16,6 +16,8 @@ import SpaceDetail from "./pages/SpaceDetail";
 import ChatPage from "./pages/ChatPage";
 import QRCodePage from "./pages/QRCodePage";
 import NotFound from "./pages/NotFound";
+import Profile from "./pages/Profile";
+import Guide from "./pages/Guide"; // Import
 
 const queryClient = new QueryClient();
 
@@ -29,6 +31,16 @@ const App = () => (
           <Routes>
             <Route path="/" element={<Landing />} />
             <Route path="/auth" element={<Auth />} />
+            <Route
+              path="/profile"
+              element={
+                <ProtectedRoute>
+                  <Profile />
+                </ProtectedRoute>
+              }
+            />
+            {/* เพิ่ม Route สำหรับหน้าคู่มือ (เข้าถึงได้ทุกคน ไม่ต้องล็อกอิน) */}
+            <Route path="/guide" element={<Guide />} />
             
             {/* Landowner Routes */}
             <Route
@@ -105,3 +117,4 @@ const App = () => (
 );
 
 export default App;
+

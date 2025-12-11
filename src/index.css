@@ -2,10 +2,6 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Definition of the design system. All colors, gradients, fonts, etc should be defined here.
-All colors MUST be HSL.
-*/
-
 @layer base {
   :root {
     --background: 120 20% 98%;
@@ -99,7 +95,8 @@ All colors MUST be HSL.
 
   body {
     @apply bg-background text-foreground;
-    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    /* เพิ่มบรรทัดนี้เพื่อให้ใช้ฟอนต์ Mitr */
+    font-family: 'Mitr', sans-serif;
   }
 
   h1, h2, h3, h4, h5, h6 {
