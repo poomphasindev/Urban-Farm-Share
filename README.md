@@ -1,73 +1,79 @@
-# Welcome to your Lovable project
+# 🏙️ Urban Farm Connect
 
-## Project info
+> **"เปลี่ยนพื้นที่ว่างในเมือง ให้กลายเป็นแหล่งอาหารของชุมชน"**
+>
+> **"Turning Urban Vacant Spaces into Community Food Sources"**
 
-**URL**: https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID
+![Project Banner](public/placeholder.svg)
+_(Note: Please replace `public/placeholder.svg` with your actual project screenshot for better visual appeal)_
 
-## How can I edit this code?
+## 📖 เกี่ยวกับโปรเจกต์ (About The Project)
 
-There are several ways of editing your application.
+**Urban Farm Connect** เป็น Web Application ที่พัฒนาขึ้นเพื่อแก้ปัญหาพื้นที่รกร้างในเขตเมือง (Urban Vacant Spaces) โดยทำหน้าที่เป็นแพลตฟอร์มตัวกลางเชื่อมโยงระหว่าง:
 
-**Use Lovable**
+1.  **Landowner (เจ้าของที่ดิน):** ผู้ที่มีพื้นที่ว่างแต่ไม่มีเวลาดูแล ต้องการให้คนมาช่วยดูแลพื้นที่ให้เกิดประโยชน์
+2.  **Gardener (นักปลูก/เกษตรกร):** คนเมืองที่อยากปลูกผักเพื่อบริโภคหรือสร้างรายได้ แต่ไม่มีพื้นที่
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and start prompting.
+โปรเจกต์นี้มุ่งเน้นการใช้เทคโนโลยีเพื่อสร้าง **Sustainability (ความยั่งยืน)** และ **Food Security (ความมั่นคงทางอาหาร)** ในระดับชุมชน พร้อมฟีเจอร์ครบวงจรตั้งแต่การค้นหาพื้นที่, การเจรจา (Chat), ไปจนถึงการติดตามสถานะการเพาะปลูก
 
-Changes made via Lovable will be committed automatically to this repo.
+---
 
-**Use your preferred IDE**
+## 🛠️ Tech Stack & Tools
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+โปรเจกต์นี้ถูกพัฒนาด้วย **Modern Web Technologies** โดยเน้น Performance, Scalability และ Developer Experience (DX)
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+### Frontend Development
 
-Follow these steps:
+- **Framework:** [React](https://react.dev/) (TypeScript)
+- **Build Tool:** [Vite](https://vitejs.dev/)
+- **Styling:** [Tailwind CSS](https://tailwindcss.com/)
+- **UI Components:** [Shadcn UI](https://ui.shadcn.com/) + Lucide Icons
+- **State Management:** React Context API + [TanStack Query](https://tanstack.com/query/latest) (Server State)
+- **Routing:** React Router v6
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+### Backend & Infrastructure
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+- **BaaS (Backend-as-a-Service):** [Supabase](https://supabase.com/)
+- **Database:** PostgreSQL
+- **Authentication:** Supabase Auth
+- **Storage:** Supabase Storage (Image Hosting)
 
-# Step 3: Install the necessary dependencies.
-npm i
+---
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
-```
+## ✨ Key Features (ฟีเจอร์หลัก)
 
-**Edit a file directly in GitHub**
+ระบบแบ่งผู้ใช้งานออกเป็น 2 Roles หลัก โดยมีการจัดการสิทธิ์ (Role-Based Access Control) อย่างชัดเจน:
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+### 👨‍🌾 สำหรับ Gardener (นักปลูก)
 
-**Use GitHub Codespaces**
+- **Smart Search:** ค้นหาพื้นที่ว่างใกล้ตัว พร้อมตัวกรองขนาดและประเภทพื้นที่
+- **Request System:** ส่งคำขอใช้พื้นที่พร้อมระบุแผนการปลูกให้เจ้าของพิจารณา
+- **Project Tracking:** ติดตามสถานะโครงการ (เริ่มปลูก, เก็บเกี่ยว) ผ่าน Dashboard
+- **Knowledge Hub:** เข้าถึงคู่มือและเทคนิคการปลูกผักในเมือง
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+### 🏢 สำหรับ Landowner (เจ้าของที่ดิน)
 
-## What technologies are used for this project?
+- **Space Management:** ลงประกาศพื้นที่ว่างพร้อมอัปโหลดรูปภาพและปักหมุด Location
+- **Tenant Screening:** ดูประวัติและแผนการปลูกของผู้ขอเช่าก่อนกดอนุมัติ
+- **Dashboard Analytics:** ดูภาพรวมทรัพย์สินและสถิติผู้เช่าในปัจจุบัน
+- **Safety Tools:** ระบบคัดกรองเบื้องต้นเพื่อความปลอดภัย
 
-This project is built with:
+### 💬 ฟีเจอร์ส่วนกลาง (Shared Features)
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+- **Real-time Chat:** ระบบแชทระหว่างเจ้าของที่และนักปลูก เพื่อตกลงรายละเอียดก่อนเริ่มงาน
+- **Profile System:** หน้าโปรไฟล์แสดงตัวตน ความน่าเชื่อถือ และประวัติการใช้งาน
+- **Responsive Design:** รองรับการใช้งานได้อย่างลื่นไหลทั้งบนมือถือและ Desktop
 
-## How can I deploy this project?
+---
 
-Simply open [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and click on Share -> Publish.
+## 📬 Contact Me
 
-## Can I connect a custom domain to my Lovable project?
+**Phasin Petluechai** - Developer & Creator
 
-Yes, you can!
+- **Education:** Computer Engineering and Digital Technology (CEDT), Chulalongkorn University
+- **GitHub:** https://github.com/poomphasindev
+- **Email:** poomphasin+work@gmail.com
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+---
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+_Note: This project is part of a portfolio demonstrating Full-stack development capabilities using React and Supabase._
