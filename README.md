@@ -4,9 +4,6 @@
 >
 > **"Turning Urban Vacant Spaces into Community Food Sources"**
 
-![Project Banner](public/placeholder.svg)
-_(Note: Please replace `public/placeholder.svg` with your actual project screenshot for better visual appeal)_
-
 ## 📖 เกี่ยวกับโปรเจกต์ (About The Project)
 
 **Urban Farm Connect** เป็น Web Application ที่พัฒนาขึ้นเพื่อแก้ปัญหาพื้นที่รกร้างในเขตเมือง (Urban Vacant Spaces) โดยทำหน้าที่เป็นแพลตฟอร์มตัวกลางเชื่อมโยงระหว่าง:
