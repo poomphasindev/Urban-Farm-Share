@@ -2,92 +2,98 @@ import { useState, useEffect } from "react";
 import { useAuth } from "@/lib/auth";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { TreePine, Plus, MapPin, Edit, Trash2, Eye, EyeOff, MessageSquare, LogOut, BookOpen, TrendingUp } from "lucide-react";
-import { Link } from "react-router-dom";
-import { useToast } from "@/hooks/use-toast";
+import { Plus, MapPin, Users, Clock, LayoutGrid, Edit, LogOut, Trash2, ArrowRight, LandPlot } from "lucide-react"; // ใช้ LandPlot แทน
+import { Link, useNavigate } from "react-router-dom";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import LandownerRequests from "./LandownerRequests";
+import { Badge } from "@/components/ui/badge";
 import { GuideSection } from "@/components/GuideSection";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { useToast } from "@/hooks/use-toast";
 
 export default function LandownerDashboard() {
   const { user, signOut } = useAuth();
+  const navigate = useNavigate();
   const { toast } = useToast();
-  const [spaces, setSpaces] = useState<any[]>([]);
+  
+  const [activeTab, setActiveTab] = useState("my-spaces");
   const [loading, setLoading] = useState(true);
-  const [requestCounts, setRequestCounts] = useState<Record<string, number>>({});
+  const [spaces, setSpaces] = useState<any[]>([]);
+  const [requests, setRequests] = useState<any[]>([]);
   const [userProfile, setUserProfile] = useState<any>(null);
-  const [activeTab, setActiveTab] = useState("spaces");
 
   useEffect(() => {
     if (user) {
-      fetchSpaces();
+      fetchData();
       fetchProfile();
     }
   }, [user]);
 
   const fetchProfile = async () => {
-    // ใช้ maybeSingle เพื่อป้องกัน Error กรณีไม่มีข้อมูล
     const { data } = await supabase.from("profiles").select("*").eq("id", user!.id).maybeSingle();
     if (data) setUserProfile(data);
   };
 
-  const fetchSpaces = async () => {
+  const fetchData = async () => {
     setLoading(true);
-    const { data, error } = await supabase
-      .from("urban_farm_spaces")
-      .select("*")
-      .eq("owner_id", user!.id)
-      .order("created_at", { ascending: false });
+    try {
+      // 1. ดึงพื้นที่ของเรา
+      const { data: spacesData } = await supabase
+        .from("urban_farm_spaces")
+        .select("*")
+        .eq("owner_id", user!.id)
+        .order("created_at", { ascending: false });
+      
+      if (spacesData) setSpaces(spacesData);
 
-    if (!error && data) {
-      setSpaces(data);
-      const counts: Record<string, number> = {};
-      for (const space of data) {
-        const { count } = await supabase
-          .from("space_requests")
-          .select("*", { count: "exact", head: true })
-          .eq("space_id", space.id)
-          .eq("status", "pending");
-        counts[space.id] = count || 0;
-      }
-      setRequestCounts(counts);
+      // 2. ดึงคำขอเช่าที่เข้ามา (เพื่อเอามานับ Stats)
+      const { data: reqData } = await supabase
+        .from("space_requests")
+        .select("id, status")
+        .in("space_id", spacesData?.map(s => s.id) || []); // ดึงเฉพาะ request ของ space เรา
+
+      if (reqData) setRequests(reqData);
+
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
-  const handleToggleActive = async (spaceId: string, currentStatus: boolean) => {
-    setSpaces(spaces.map(s => s.id === spaceId ? { ...s, is_active: !currentStatus } : s));
-    await supabase.from("urban_farm_spaces").update({ is_active: !currentStatus }).eq("id", spaceId);
+  const handleDeleteSpace = async (spaceId: string) => {
+    try {
+      const { error } = await supabase.from("urban_farm_spaces").delete().eq("id", spaceId);
+      if (error) throw error;
+      setSpaces(spaces.filter((s) => s.id !== spaceId));
+      toast({ title: "ลบพื้นที่สำเร็จ", description: "พื้นที่ของคุณถูกลบออกจากระบบแล้ว" });
+    } catch (error: any) {
+      toast({ title: "เกิดข้อผิดพลาด", description: error.message, variant: "destructive" });
+    }
   };
 
-  const handleDelete = async (spaceId: string) => {
-    if(!confirm("ยืนยันการลบพื้นที่นี้?")) return;
-    await supabase.from("urban_farm_spaces").delete().eq("id", spaceId);
-    fetchSpaces();
-    toast({ title: "ลบพื้นที่สำเร็จ" });
+  // Stats Calculation
+  const stats = {
+    totalSpaces: spaces.length,
+    activeTenants: requests.filter(r => r.status === 'approved' || r.status === 'active').length,
+    pendingRequests: requests.filter(r => r.status === 'pending').length
   };
-
-  // Real Stats Calculation
-  const totalSpaces = spaces.length;
-  const activeSpaces = spaces.filter(s => s.is_active).length;
-  const totalRequests = Object.values(requestCounts).reduce((a, b) => a + b, 0);
 
   return (
-    <div className="min-h-screen bg-[#F8FAF9] pb-20 font-sans">
+    <div className="min-h-screen bg-[#F8FAF9] pb-24 font-sans">
+      {/* Header */}
       <header className="bg-white/80 backdrop-blur-md sticky top-0 z-30 border-b border-border/50 px-4 py-3 shadow-sm">
-        <div className="container mx-auto flex items-center justify-between max-w-4xl">
-           <Link to="/profile" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
-            <Avatar className="h-9 w-9 border cursor-pointer ring-2 ring-green-50">
+        <div className="container mx-auto flex items-center justify-between max-w-lg">
+          <Link to="/profile" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
+            <Avatar className="h-9 w-9 border cursor-pointer ring-2 ring-emerald-50">
               <AvatarImage src={userProfile?.avatar_url} />
-              <AvatarFallback className="bg-green-100 text-green-700 font-bold">
+              <AvatarFallback className="bg-emerald-100 text-emerald-700 font-bold">
                 {userProfile?.name?.charAt(0) || user?.email?.charAt(0)}
               </AvatarFallback>
             </Avatar>
-            <div className="hidden sm:block">
+            <div>
               <p className="text-sm font-bold text-foreground leading-none">
                 {userProfile?.name || "Landowner"}
               </p>
@@ -100,146 +106,173 @@ export default function LandownerDashboard() {
         </div>
       </header>
 
-      <main className="container mx-auto px-4 py-8 max-w-4xl space-y-8">
+      <main className="container mx-auto px-4 py-6 max-w-lg space-y-6">
         
-        {/* Header & Add Button */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight text-slate-800">จัดการพื้นที่</h1>
-            <p className="text-slate-500 mt-1">บริหารจัดการพื้นที่และตรวจสอบคำขอเช่า</p>
-          </div>
-          <Button asChild className="rounded-full shadow-lg bg-green-600 hover:bg-green-700 px-6 h-11 text-base transition-transform hover:scale-105 active:scale-95">
-            <Link to="/dashboard/landowner/spaces/new">
-              <Plus className="mr-2 h-5 w-5" /> เพิ่มพื้นที่ใหม่
-            </Link>
-          </Button>
+        {/* 1. Profile Card (Landowner Style) */}
+        <div className="animate-in fade-in slide-in-from-top-2 duration-500">
+          <Card className="bg-gradient-to-br from-blue-600 to-indigo-700 border-none shadow-lg text-white overflow-hidden relative">
+            <div className="absolute top-0 right-0 p-4 opacity-10">
+               <LandPlot className="w-32 h-32 -mr-8 -mt-8" />
+            </div>
+            
+            <CardContent className="p-6 flex items-start gap-5 relative z-10">
+              <Avatar className="h-20 w-20 border-4 border-white/20 shadow-xl rounded-full">
+                <AvatarImage src={userProfile?.avatar_url} className="object-cover" />
+                <AvatarFallback className="bg-white text-blue-700 text-2xl font-bold">
+                  {userProfile?.name?.charAt(0) || user?.email?.charAt(0)}
+                </AvatarFallback>
+              </Avatar>
+              
+              <div className="flex-1 space-y-1">
+                <h2 className="text-xl font-bold leading-tight">
+                  {userProfile?.name || "ยินดีต้อนรับ"}
+                </h2>
+                <div className="flex flex-wrap gap-2 text-blue-50 text-xs items-center mt-1">
+                  <Badge variant="secondary" className="bg-white/20 text-white hover:bg-white/30 border-none px-2 py-0.5 font-normal backdrop-blur-sm">
+                    Verified Landowner
+                  </Badge>
+                </div>
+                <p className="text-blue-100/80 text-xs flex items-center gap-1 pt-1">
+                  <MapPin className="w-3 h-3" />
+                  {userProfile?.location || "กรุงเทพมหานคร"}
+                </p>
+                <div className="pt-3">
+                  <Button variant="secondary" size="sm" asChild className="h-8 bg-white text-blue-700 hover:bg-blue-50 border-none shadow-sm text-xs font-bold px-4">
+                    <Link to="/profile">
+                      <Edit className="w-3 h-3 mr-1.5" /> แก้ไขโปรไฟล์
+                    </Link>
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         </div>
 
-        {/* Stats Grid (Real Data) */}
-        {!loading && spaces.length > 0 && (
-            <div className="grid grid-cols-3 gap-4">
-                <Card className="border-none shadow-sm bg-white rounded-2xl p-4 flex flex-col items-center justify-center text-center">
-                    <div className="w-10 h-10 rounded-full bg-green-50 flex items-center justify-center text-green-600 mb-2">
-                        <TreePine className="w-5 h-5" />
+        {/* 2. Stats Dashboard (Overview) */}
+        <div className="grid grid-cols-3 gap-3">
+            <Card className="border-none shadow-sm bg-white">
+                <CardContent className="p-4 flex flex-col items-center justify-center text-center">
+                    <div className="w-8 h-8 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center mb-2">
+                        <LayoutGrid className="w-4 h-4" />
                     </div>
-                    <div className="text-2xl font-bold text-slate-800">{totalSpaces}</div>
-                    <div className="text-xs text-slate-500">พื้นที่ทั้งหมด</div>
-                </Card>
-                <Card className="border-none shadow-sm bg-white rounded-2xl p-4 flex flex-col items-center justify-center text-center">
-                    <div className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center text-blue-600 mb-2">
-                        <TrendingUp className="w-5 h-5" />
+                    <span className="text-2xl font-bold text-slate-800">{stats.totalSpaces}</span>
+                    <span className="text-[10px] text-slate-500">พื้นที่ทั้งหมด</span>
+                </CardContent>
+            </Card>
+            <Card className="border-none shadow-sm bg-white">
+                <CardContent className="p-4 flex flex-col items-center justify-center text-center">
+                    <div className="w-8 h-8 rounded-full bg-green-50 text-green-600 flex items-center justify-center mb-2">
+                        <Users className="w-4 h-4" />
                     </div>
-                    <div className="text-2xl font-bold text-slate-800">{activeSpaces}</div>
-                    <div className="text-xs text-slate-500">เปิดใช้งาน</div>
+                    <span className="text-2xl font-bold text-slate-800">{stats.activeTenants}</span>
+                    <span className="text-[10px] text-slate-500">ผู้เช่าActive</span>
+                </CardContent>
+            </Card>
+            <Link to="/dashboard/landowner/requests">
+                <Card className="border-none shadow-sm bg-white hover:bg-orange-50 transition-colors cursor-pointer ring-1 ring-orange-100">
+                    <CardContent className="p-4 flex flex-col items-center justify-center text-center relative">
+                        {stats.pendingRequests > 0 && (
+                            <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full animate-pulse"></span>
+                        )}
+                        <div className="w-8 h-8 rounded-full bg-orange-100 text-orange-600 flex items-center justify-center mb-2">
+                            <Clock className="w-4 h-4" />
+                        </div>
+                        <span className="text-2xl font-bold text-slate-800">{stats.pendingRequests}</span>
+                        <span className="text-[10px] text-slate-500">รออนุมัติ</span>
+                    </CardContent>
                 </Card>
-                <Card className={`border-none shadow-sm rounded-2xl p-4 flex flex-col items-center justify-center text-center ${totalRequests > 0 ? "bg-orange-50" : "bg-white"}`}>
-                    <div className={`w-10 h-10 rounded-full flex items-center justify-center mb-2 ${totalRequests > 0 ? "bg-white text-orange-600" : "bg-slate-50 text-slate-400"}`}>
-                        <MessageSquare className="w-5 h-5" />
-                    </div>
-                    <div className={`text-2xl font-bold ${totalRequests > 0 ? "text-orange-600" : "text-slate-800"}`}>{totalRequests}</div>
-                    <div className="text-xs text-slate-500">คำขอรอตรวจสอบ</div>
-                </Card>
-            </div>
-        )}
+            </Link>
+        </div>
 
-        {/* Tabs */}
+        {/* 3. Action Button & Tabs */}
+        <div className="flex justify-between items-center">
+            <h3 className="text-lg font-bold text-slate-800">จัดการพื้นที่</h3>
+            <Button size="sm" onClick={() => navigate("/dashboard/landowner/spaces/new")} className="bg-emerald-600 hover:bg-emerald-700 shadow-sm text-xs h-8">
+                <Plus className="w-4 h-4 mr-1" /> ลงประกาศใหม่
+            </Button>
+        </div>
+
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-3 h-14 bg-white p-1.5 rounded-xl shadow-sm border border-slate-100">
-            <TabsTrigger value="spaces" className="rounded-lg data-[state=active]:bg-green-50 data-[state=active]:text-green-700 font-medium text-slate-500 transition-all">
-               <TreePine className="w-4 h-4 mr-2" /> พื้นที่ของฉัน
+          <TabsList className="grid w-full grid-cols-2 bg-white p-1 rounded-xl shadow-sm h-12">
+            <TabsTrigger value="my-spaces" className="rounded-lg data-[state=active]:bg-blue-50 data-[state=active]:text-blue-700 font-medium text-slate-500">
+              พื้นที่ของฉัน
             </TabsTrigger>
-            <TabsTrigger value="requests" className="rounded-lg data-[state=active]:bg-orange-50 data-[state=active]:text-orange-700 font-medium text-slate-500 relative transition-all">
-               <MessageSquare className="w-4 h-4 mr-2" /> คำขอเช่า
-               {totalRequests > 0 && (
-                   <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-orange-500 animate-pulse"></span>
-               )}
-            </TabsTrigger>
-            <TabsTrigger value="guide" className="rounded-lg data-[state=active]:bg-blue-50 data-[state=active]:text-blue-700 font-medium text-slate-500 transition-all">
-               <BookOpen className="w-4 h-4 mr-2" /> คู่มือ
+            <TabsTrigger value="guide" className="rounded-lg data-[state=active]:bg-emerald-50 data-[state=active]:text-emerald-700 font-medium text-slate-500">
+               คู่มือเจ้าของที่
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="spaces" className="space-y-6">
+          <TabsContent value="my-spaces" className="space-y-4">
             {loading ? (
-              <div className="grid md:grid-cols-2 gap-6">
-                {[1, 2].map(i => <Skeleton key={i} className="h-[280px] w-full rounded-[2rem]" />)}
-              </div>
+              [1, 2].map(i => <Skeleton key={i} className="h-40 w-full rounded-2xl" />)
             ) : spaces.length === 0 ? (
-              <div className="text-center py-20 bg-white rounded-3xl border border-dashed border-slate-200 flex flex-col items-center">
-                <div className="bg-green-50 p-6 rounded-full mb-6">
-                    <MapPin className="h-12 w-12 text-green-300" />
-                </div>
-                <h3 className="text-xl font-bold text-slate-800 mb-2">ยังไม่มีพื้นที่ลงทะเบียน</h3>
-                <p className="text-slate-500 mb-8 max-w-xs mx-auto">เริ่มแบ่งปันพื้นที่ว่างของคุณวันนี้ เพื่อสร้างรายได้และสังคมสีเขียว</p>
-                <Button className="rounded-full h-12 px-8 text-base bg-green-600 hover:bg-green-700 shadow-lg hover:shadow-xl transition-all" asChild>
-                    <Link to="/dashboard/landowner/spaces/new">เพิ่มพื้นที่เลย</Link>
+              <div className="text-center py-12 bg-white rounded-2xl border border-dashed border-slate-200">
+                <LandPlot className="mx-auto h-12 w-12 text-slate-300 mb-3" />
+                <h3 className="text-lg font-medium text-slate-900">ยังไม่มีพื้นที่</h3>
+                <p className="text-sm text-slate-500 mb-6">เริ่มลงประกาศพื้นที่ว่างของคุณเพื่อให้คนเมืองได้ปลูกผัก</p>
+                <Button onClick={() => navigate("/dashboard/landowner/spaces/new")}>
+                  <Plus className="mr-2 h-4 w-4" /> เพิ่มพื้นที่ใหม่
                 </Button>
               </div>
             ) : (
-              <div className="grid md:grid-cols-2 gap-6">
-                {spaces.map((space) => (
-                  <Card key={space.id} className="group border-none shadow-sm hover:shadow-xl transition-all duration-300 rounded-[2rem] bg-white overflow-hidden ring-1 ring-slate-100 hover:-translate-y-1">
-                    <div className="p-0">
-                        {/* Image Header - Fix Animation */}
-                        <div className="h-40 bg-slate-100 relative overflow-hidden">
-                             {space.image_url ? 
-                                <img src={space.image_url} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" /> :
-                                <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-green-50 to-emerald-100"><TreePine className="text-green-200 w-16 h-16" /></div>
-                             }
-                             
-                             {/* Status Badge */}
-                             <div className="absolute top-4 left-4">
-                                <Badge variant={space.is_active ? "default" : "secondary"} className={`rounded-lg px-2.5 py-1 font-semibold shadow-sm backdrop-blur-md border-none ${space.is_active ? "bg-green-500/90 hover:bg-green-600 text-white" : "bg-slate-500/80 text-white"}`}>
-                                  {space.is_active ? "• เปิดใช้งาน" : "• ปิดชั่วคราว"}
-                                </Badge>
-                             </div>
-
-                             {/* Edit Button (Visible on Hover) */}
-                             <Link to={`/dashboard/landowner/spaces/${space.id}/edit`} className="absolute top-4 right-4 p-2 bg-white/90 backdrop-blur rounded-full text-slate-600 hover:text-green-600 shadow-sm opacity-0 group-hover:opacity-100 transition-all translate-y-2 group-hover:translate-y-0">
-                                <Edit className="w-4 h-4" />
-                             </Link>
+              spaces.map((space) => (
+                <Card key={space.id} className="overflow-hidden border-none shadow-sm hover:shadow-md transition-all rounded-2xl bg-white group ring-1 ring-slate-100">
+                  <div className="flex h-32">
+                    {/* Image Section */}
+                    <div className="w-1/3 relative">
+                      {space.image_url ? (
+                        <img src={space.image_url} alt={space.title} className="w-full h-full object-cover" />
+                      ) : (
+                        <div className="w-full h-full bg-slate-100 flex items-center justify-center">
+                          <LandPlot className="text-slate-300" />
                         </div>
-
-                        <div className="p-6">
-                          <h3 className="text-xl font-bold line-clamp-1 text-slate-800 group-hover:text-green-700 transition-colors mb-2">{space.title}</h3>
-                          
-                          <div className="flex items-center text-slate-500 text-sm mb-6 bg-slate-50 p-2 rounded-lg">
-                            <MapPin className="h-3.5 w-3.5 mr-2 text-green-500 shrink-0" />
-                            <span className="truncate">{space.address}</span>
-                          </div>
-
-                          <div className="flex gap-2 mt-auto">
-                            <Button variant="outline" size="sm" className={`flex-1 rounded-xl border-slate-200 h-10 ${space.is_active ? 'text-slate-600 hover:bg-slate-50' : 'text-green-600 bg-green-50 border-green-200 hover:bg-green-100'}`} onClick={() => handleToggleActive(space.id, space.is_active)}>
-                              {space.is_active ? <><EyeOff className="h-4 w-4 mr-2" /> ซ่อนพื้นที่</> : <><Eye className="h-4 w-4 mr-2" /> แสดงพื้นที่</>}
-                            </Button>
-                             <Button variant="ghost" size="icon" className="rounded-xl text-slate-400 hover:text-red-500 hover:bg-red-50 h-10 w-10 border border-transparent hover:border-red-100" onClick={() => handleDelete(space.id)}>
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
-                          
-                          {/* New Requests Notification */}
-                          {requestCounts[space.id] > 0 && (
-                             <div className="mt-4 pt-4 border-t border-slate-100 animate-in slide-in-from-top-2">
-                                <Button variant="ghost" className="w-full text-white bg-orange-500 hover:bg-orange-600 hover:shadow-md rounded-xl justify-between h-10 px-4 transition-all" onClick={() => setActiveTab("requests")}>
-                                    <span className="text-xs font-bold flex items-center gap-2"><MessageSquare className="w-4 h-4 fill-white" /> มี {requestCounts[space.id]} คำขอใหม่</span>
-                                    <span className="bg-white/20 text-white text-[10px] px-2 py-0.5 rounded-full">ตรวจสอบเลย</span>
-                                </Button>
-                             </div>
-                          )}
-                        </div>
+                      )}
+                      <div className={`absolute top-2 left-2 px-2 py-0.5 rounded text-[10px] font-bold shadow-sm ${space.is_active ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-600'}`}>
+                         {space.is_active ? 'เปิดรับ' : 'ปิดชั่วคราว'}
+                      </div>
                     </div>
-                  </Card>
-                ))}
-              </div>
+                    
+                    {/* Content Section */}
+                    <div className="w-2/3 p-4 flex flex-col justify-between">
+                      <div>
+                        <h3 className="font-bold text-slate-800 line-clamp-1">{space.title}</h3>
+                        <p className="text-xs text-slate-500 flex items-center mt-1">
+                           <MapPin className="w-3 h-3 mr-1" /> {space.address}
+                        </p>
+                      </div>
+                      
+                      <div className="flex justify-end items-center gap-2 mt-2">
+                         <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-full" onClick={() => navigate(`/dashboard/landowner/spaces/${space.id}/edit`)}>
+                            <Edit className="w-4 h-4" />
+                         </Button>
+
+                         <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                                <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-full">
+                                    <Trash2 className="w-4 h-4" />
+                                </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                                <AlertDialogHeader>
+                                    <AlertDialogTitle>ยืนยันการลบพื้นที่?</AlertDialogTitle>
+                                    <AlertDialogDescription>การกระทำนี้ไม่สามารถย้อนกลับได้ ข้อมูลพื้นที่และประวัติการเช่าทั้งหมดจะถูกลบ</AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                    <AlertDialogCancel>ยกเลิก</AlertDialogCancel>
+                                    <AlertDialogAction onClick={() => handleDeleteSpace(space.id)} className="bg-red-600 hover:bg-red-700">ยืนยันลบ</AlertDialogAction>
+                                </AlertDialogFooter>
+                            </AlertDialogContent>
+                         </AlertDialog>
+                      </div>
+                    </div>
+                  </div>
+                </Card>
+              ))
             )}
           </TabsContent>
 
-          <TabsContent value="requests">
-             <LandownerRequests />
-          </TabsContent>
-
           <TabsContent value="guide">
-             <GuideSection role="landowner" />
+            <GuideSection role="landowner" />
           </TabsContent>
         </Tabs>
       </main>

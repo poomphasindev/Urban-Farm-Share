@@ -6,7 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Search, MapPin, Sprout, LogOut, MessageCircle, TreePine, Calendar, CheckCircle2, Leaf, ArrowRight } from "lucide-react";
+import { Search, MapPin, Sprout, LogOut, MessageCircle, TreePine, Calendar, Leaf, ArrowRight, Edit, User as UserIcon } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Progress } from "@/components/ui/progress";
@@ -33,7 +33,6 @@ export default function GardenerDashboard() {
   }, [user]);
 
   const fetchProfile = async () => {
-    // ดึงข้อมูล Profile จริงๆ จากฐานข้อมูล
     const { data } = await supabase.from("profiles").select("*").eq("id", user!.id).maybeSingle();
     if (data) setUserProfile(data);
   };
@@ -48,13 +47,21 @@ export default function GardenerDashboard() {
         .order("created_at", { ascending: false });
       
       const ownerIds = [...new Set(spacesData?.map(s => s.owner_id) || [])];
-      // ดึงชื่อเจ้าของที่ดินมาแสดง
-      const { data: profilesData } = await supabase.from("profiles").select("id, name").in("id", ownerIds);
+      
+      // ✅ แก้ไข 1: ดึง avatar_url ของเจ้าของที่ดินมาด้วย
+      const { data: profilesData } = await supabase
+        .from("profiles")
+        .select("id, name, avatar_url") 
+        .in("id", ownerIds);
 
-      setSpaces(spacesData?.map(space => ({
-        ...space,
-        owner_name: profilesData?.find(p => p.id === space.owner_id)?.name || "ไม่ระบุชื่อ"
-      })) || []);
+      setSpaces(spacesData?.map(space => {
+        const owner = profilesData?.find(p => p.id === space.owner_id);
+        return {
+          ...space,
+          owner_name: owner?.name || "ไม่ระบุชื่อ",
+          owner_avatar: owner?.avatar_url // เก็บ url รูปเจ้าของไว้ใช้
+        };
+      }) || []);
 
       const { data: reqData } = await supabase
         .from("space_requests")
@@ -119,6 +126,50 @@ export default function GardenerDashboard() {
 
       <main className="container mx-auto px-4 py-6 max-w-lg space-y-6">
         
+        {/* Profile Card (Simplified - No Hardcoded AI/CEDT) */}
+        <div className="animate-in fade-in slide-in-from-top-2 duration-500">
+          <Card className="bg-gradient-to-br from-emerald-600 to-teal-700 border-none shadow-lg text-white overflow-hidden relative">
+            <div className="absolute top-0 right-0 p-4 opacity-10">
+               <TreePine className="w-32 h-32 -mr-8 -mt-8" />
+            </div>
+            
+            <CardContent className="p-6 flex items-start gap-5 relative z-10">
+              <Avatar className="h-20 w-20 border-4 border-white/20 shadow-xl rounded-full">
+                <AvatarImage src={userProfile?.avatar_url} className="object-cover" />
+                <AvatarFallback className="bg-white text-emerald-700 text-2xl font-bold">
+                  {userProfile?.name?.charAt(0) || user?.email?.charAt(0)}
+                </AvatarFallback>
+              </Avatar>
+              
+              <div className="flex-1 space-y-1">
+                <h2 className="text-xl font-bold leading-tight">
+                  {userProfile?.name || "ยินดีต้อนรับ"}
+                </h2>
+                
+                {/* ✅ แก้ไข 2: ใช้ Role กลางๆ และเอาข้อมูล Hardcoded ออก */}
+                <div className="flex flex-wrap gap-2 text-emerald-50 text-xs items-center mt-1">
+                  <Badge variant="secondary" className="bg-white/20 text-white hover:bg-white/30 border-none px-2 py-0.5 font-normal backdrop-blur-sm">
+                    Gardener Member
+                  </Badge>
+                </div>
+
+                <p className="text-emerald-100/80 text-xs flex items-center gap-1 pt-1">
+                  <MapPin className="w-3 h-3" />
+                  {userProfile?.location || "กรุงเทพมหานคร"}
+                </p>
+
+                <div className="pt-3">
+                  <Button variant="secondary" size="sm" asChild className="h-8 bg-white text-emerald-700 hover:bg-emerald-50 border-none shadow-sm text-xs font-bold px-4">
+                    <Link to="/profile">
+                      <Edit className="w-3 h-3 mr-1.5" /> แก้ไขโปรไฟล์
+                    </Link>
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
         {/* Active Farm Section */}
         {!loading && activeFarm && (
           <div className="animate-in fade-in slide-in-from-top-4 duration-500">
@@ -129,23 +180,27 @@ export default function GardenerDashboard() {
               </span>
               <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">แปลงที่กำลังปลูก</h2>
             </div>
-            <Card className="border-none shadow-lg bg-gradient-to-br from-green-600 to-teal-700 text-white rounded-2xl overflow-hidden relative">
-              <div className="absolute top-0 right-0 p-3 opacity-10 pointer-events-none"><TreePine className="w-40 h-40 transform rotate-12 translate-x-10 -translate-y-10" /></div>
-              <CardContent className="p-6 relative z-10">
-                <h3 className="text-2xl font-bold mb-1">{activeFarm.urban_farm_spaces.title}</h3>
-                <p className="text-emerald-100 text-sm flex items-center opacity-90 mb-6">
-                  <MapPin className="w-3.5 h-3.5 mr-1.5" /> {activeFarm.urban_farm_spaces.address}
-                </p>
-
-                <div className="space-y-2 bg-black/20 p-4 rounded-xl border border-white/10">
-                  <div className="flex justify-between text-sm font-medium">
-                    <span>ระยะเวลาโครงการ</span>
-                    <span>เหลือ {getDaysRemaining(activeFarm).days} วัน</span>
-                  </div>
-                  <Progress value={getDaysRemaining(activeFarm).percent} className="h-2 bg-black/20" indicatorClassName="bg-white" />
+            <Card className="border-none shadow-lg bg-white ring-1 ring-slate-100 rounded-2xl overflow-hidden relative">
+              <CardContent className="p-5 relative z-10">
+                <div className="flex justify-between items-start mb-3">
+                   <div>
+                      <h3 className="text-lg font-bold text-slate-800">{activeFarm.urban_farm_spaces.title}</h3>
+                      <p className="text-slate-500 text-sm flex items-center">
+                        <MapPin className="w-3.5 h-3.5 mr-1" /> {activeFarm.urban_farm_spaces.address}
+                      </p>
+                   </div>
+                   <Badge className="bg-green-100 text-green-700 hover:bg-green-200 border-none">Active</Badge>
                 </div>
 
-                <Button asChild className="w-full mt-5 bg-white text-emerald-800 hover:bg-emerald-50 rounded-xl font-bold shadow-md h-11">
+                <div className="space-y-2 bg-slate-50 p-3 rounded-xl border border-slate-100 mb-4">
+                  <div className="flex justify-between text-xs font-medium text-slate-600">
+                    <span>ระยะเวลาโครงการ</span>
+                    <span className="text-emerald-600">เหลือ {getDaysRemaining(activeFarm).days} วัน</span>
+                  </div>
+                  <Progress value={getDaysRemaining(activeFarm).percent} className="h-2" />
+                </div>
+
+                <Button asChild className="w-full bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold shadow-md h-10">
                   <Link to={`/requests/${activeFarm.id}/chat`}>
                     <MessageCircle className="w-4 h-4 mr-2" /> เข้าสู่พื้นที่ / พูดคุย
                   </Link>
@@ -155,7 +210,7 @@ export default function GardenerDashboard() {
           </div>
         )}
 
-        {/* Search Bar (Clean Version - No Filter Button) */}
+        {/* Search Bar */}
         <div className="relative shadow-sm">
             <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none">
                 <Search className="h-5 w-5 text-muted-foreground" />
@@ -195,7 +250,6 @@ export default function GardenerDashboard() {
                 <Link to={`/spaces/${space.id}`} key={space.id} className="block group">
                   <Card className="overflow-hidden border-none shadow-sm hover:shadow-lg transition-all duration-300 rounded-3xl bg-white h-full ring-1 ring-slate-100">
                     
-                    {/* Image Area - Fix Square/Curve Issue */}
                     <div className="aspect-video bg-slate-100 relative overflow-hidden">
                       {space.image_url ? (
                         <img 
@@ -209,7 +263,6 @@ export default function GardenerDashboard() {
                         </div>
                       )}
                       
-                      {/* Real Badges Only */}
                       <div className="absolute top-3 left-3 flex gap-2">
                         {space.farm_type && (
                             <Badge className="bg-white/90 text-slate-700 backdrop-blur-md border-none font-medium px-2 py-0.5 text-xs shadow-sm">
@@ -218,7 +271,6 @@ export default function GardenerDashboard() {
                         )}
                       </div>
                       
-                      {/* Price Tag (Real Data) */}
                       {space.price > 0 ? (
                         <div className="absolute bottom-3 right-3 bg-emerald-600 text-white px-2.5 py-1 rounded-lg font-bold text-xs shadow-md">
                             ฿{space.price.toLocaleString()}
@@ -240,7 +292,6 @@ export default function GardenerDashboard() {
                         <span className="truncate">{space.address}</span>
                       </div>
 
-                      {/* Info Grid - Real Data */}
                       <div className="flex flex-wrap gap-2 mb-4">
                         <div className="inline-flex items-center text-xs text-slate-600 bg-slate-50 px-2 py-1 rounded-md border border-slate-100">
                            <Calendar className="h-3 w-3 mr-1.5 text-slate-400" />
@@ -254,10 +305,14 @@ export default function GardenerDashboard() {
                       </div>
 
                       <div className="pt-3 border-t border-slate-50 flex items-center justify-between">
+                         {/* ✅ แก้ไข 3: แสดงรูปเจ้าของที่ดิน (Landowner Avatar) */}
                          <div className="flex items-center gap-2">
-                            <div className="w-6 h-6 rounded-full bg-slate-100 flex items-center justify-center text-[10px] font-bold text-slate-500">
+                            <Avatar className="w-6 h-6 border border-slate-100">
+                              <AvatarImage src={space.owner_avatar} />
+                              <AvatarFallback className="bg-slate-100 text-[10px] text-slate-500 font-bold">
                                 {space.owner_name?.charAt(0)}
-                            </div>
+                              </AvatarFallback>
+                            </Avatar>
                             <span className="text-xs text-slate-500">{space.owner_name}</span>
                          </div>
                          <div className="text-emerald-600 font-bold text-xs flex items-center gap-1">
@@ -281,7 +336,6 @@ export default function GardenerDashboard() {
              requests.map((req) => (
                 <Card key={req.id} className="border-none shadow-sm rounded-2xl bg-white overflow-hidden ring-1 ring-slate-100 hover:shadow-md transition-all">
                   <div className="p-4 flex gap-4">
-                      {/* Thumbnail Small */}
                       <div className="w-20 h-20 rounded-xl bg-slate-100 shrink-0 overflow-hidden">
                           {req.urban_farm_spaces?.image_url ? (
                               <img src={req.urban_farm_spaces.image_url} className="w-full h-full object-cover" />
